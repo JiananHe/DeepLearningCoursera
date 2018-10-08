@@ -133,7 +133,7 @@ if __name__=="__main__":
     # print_mislabeled_images(classes, test_x, test_y, p_test)
 
     # Try own images
-    my_image = "my_image.jpg"
+    my_image = "my_image.JPG"
     image = np.array(ndimage.imread(my_image, flatten=False))
     my_image = scipy.misc.imresize(image, size=(64, 64)).reshape(64 * 64 * 3, 1)
     my_label = [1] # the true class of your image (1 -> cat, 0 -> non-cat)
