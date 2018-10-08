@@ -23,7 +23,8 @@ def initialize_parameters_deep(layer_dims):
     L = len(layer_dims)  # number of layers in the network
 
     for l in range(1, L):
-        parameters['W' + str(l)] = np.random.randn(layer_dims[l], layer_dims[l - 1]) * 0.01
+        # parameters['W' + str(l)] = np.random.randn(layer_dims[l], layer_dims[l - 1]) * 0.01
+        parameters['W' + str(l)] = np.random.randn(layer_dims[l], layer_dims[l - 1]) / np.sqrt(layer_dims[l - 1])
         parameters['b' + str(l)] = np.zeros((layer_dims[l], 1))
 
         assert (parameters['W' + str(l)].shape == (layer_dims[l], layer_dims[l - 1]))
@@ -174,8 +175,8 @@ def compute_cost(AL, Y):
     # Compute loss from aL and y.
     # cost = - (np.dot(Y, np.log(AL).T) + np.dot(1 - Y, np.log(1-AL).T)) / m
     # cost = (-1 / m) * np.sum(np.multiply(Y, np.log(AL)) + np.multiply(1 - Y, np.log(1 - AL)))
-    # cost = -np.sum(np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), 1 - Y)) / m
-    cost = -np.sum(np.multiply(Y, np.log(AL)) + np.multiply(1-Y, np.log(1-AL)), axis=1, keepdims=True)/m
+    cost = -np.sum(np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), 1 - Y)) / m
+    # cost = -np.sum(np.multiply(Y, np.log(AL)) + np.multiply(1-Y, np.log(1-AL)), axis=1, keepdims=True)/m
 
 
     cost = np.squeeze(cost)  # To make sure your cost's shape is what we expect (e.g. this turns [[17]] into 17).
@@ -245,12 +246,11 @@ def linear_activation_backward(dA, cache, activation):
 
     if activation == "relu":
         dZ = relu_backward(dA, activation_cache)
-
+        dA_prev, dW, db = linear_backward(dZ, linear_cache)
     elif activation == "sigmoid":
         dZ = sigmoid_backward(dA, activation_cache)
-
+        dA_prev, dW, db = linear_backward(dZ, linear_cache)
     # Shorten the code
-    dA_prev, dW, db = linear_backward(dZ, linear_cache)
 
     return dA_prev, dW, db
 
@@ -294,13 +294,12 @@ def L_model_backward(AL, Y, caches):
     Y = Y.reshape(AL.shape)  # after this line, Y is the same shape as AL
 
     # Initializing the backpropagation, derivation of loss function
-    dA = - (np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
+    dAL = - (np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
 
     # Lth layer (SIGMOID -> LINEAR) gradients.
     # Inputs: "AL, Y, caches". Outputs: "grads["dAL"], grads["dWL"], grads["dbL"]
     current_cache = caches[L - 1]
-    grads["dA" + str(L)], grads["dW" + str(L)], grads["db" + str(L)] = \
-        linear_activation_backward(dA, current_cache, "sigmoid")
+    grads["dA" + str(L)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(dAL, current_cache, "sigmoid")
 
     for l in reversed(range(L - 1)):
         # lth layer: (RELU -> LINEAR) gradients.
