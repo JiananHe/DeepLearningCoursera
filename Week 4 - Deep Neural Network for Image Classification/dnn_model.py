@@ -60,17 +60,86 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     return parameters
 
 
-# Load dataset
-train_x_orig, train_y, test_x_orig, test_y, classes = load_dataset()
+def predict(X, y, parameters):
+    """
+    This function is used to predict the results of a  L-layer neural network.
 
-# Reshape dataset, The "-1" makes reshape flatten the remaining d
-train_x_flatten = train_x_orig.reshape(train_x_orig.shape[0], -1).T
-test_x_flatten = test_x_orig.reshape(test_x_orig.shape[0], -1).T
+    Arguments:
+    X -- data set of examples you would like to label
+    parameters -- parameters of the trained model
 
-# Standard data
-train_x = train_x_flatten / 255
-test_x = test_x_flatten / 255
+    Returns:
+    p -- predictions for the given dataset X
+    """
+    m = X.shape[1]
+    p = np.zeros((1, m))
 
-# Training the model
-layers_dims = [12288, 20, 7, 5, 1]  # 5-layer model
-parameters = L_layer_model(train_x, train_y, layers_dims, num_iterations=2500, print_cost=True, plot_cost=True)
+    # Forward propagation
+    probas, caches = L_model_forward(X, parameters)
+
+    # convert probas to 0/1 predictions
+    for i in range(0, probas.shape[1]):
+        if probas[0, i] > 0.5:
+            p[0, i] = 1
+        else:
+            p[0, i] = 0
+
+    print(np.sum((p == y)))
+    print("Accuracy: " + str(float(np.sum((p == y))) / m))
+
+    return p
+
+
+def print_mislabeled_images(classes, X, y, p):
+    """
+    :param classes: example classes(cat or non-cat)
+    :param X: data set of examples
+    :param y: labels of examples
+    :param p: predicts of examples
+    """
+    a = p + y
+    mislabeled_indices = np.asarray(np.where(a == 1))
+    plt.rcParams['figure.figsize'] = (40.0, 40.0)  # set default size of plots
+    num_images = len(mislabeled_indices[0])
+
+    for i in range(num_images):
+        index = mislabeled_indices[1][i]
+
+        plt.subplot(2, num_images, i + 1)
+        plt.imshow(X[:, index].reshape(64, 64, 3), interpolation='nearest')
+        plt.axis('off')
+        plt.title("Prediction: " + classes[int(p[0, index])].decode("utf-8") +
+                  " \n Class: " + classes[y[0, index]].decode("utf-8"))
+
+    plt.show()
+
+
+if __name__=="__main__":
+    # Load and standard dataset
+    train_x_orig, train_y, test_x_orig, test_y, classes = load_dataset()
+
+    train_x = train_x_orig.reshape(train_x_orig.shape[0], -1).T / 255
+    test_x = test_x_orig.reshape(test_x_orig.shape[0], -1).T / 255
+
+    # Training the model
+    layers_dims = [12288, 20, 7, 5, 1]  # 5-layer model
+    parameters = L_layer_model(train_x, train_y, layers_dims, num_iterations=2500, print_cost=True, plot_cost=False)
+
+    # Model accuracy
+    p_train = predict(train_x, train_y, parameters)
+    p_test = predict(test_x, test_y, parameters)
+
+    # Plot the mislabeled images
+    # print_mislabeled_images(classes, test_x, test_y, p_test)
+
+    # Try own images
+    my_image = "my_image.jpg"
+    image = np.array(ndimage.imread(my_image, flatten=False))
+    my_image = scipy.misc.imresize(image, size=(64, 64)).reshape(64 * 64 * 3, 1)
+    my_label = [1] # the true class of your image (1 -> cat, 0 -> non-cat)
+    my_predict = predict(my_image, my_label, parameters)
+
+    plt.imshow(image)
+    plt.title("Prediction: " + classes[int(my_predict[0])].decode("utf-8") +
+              " \n Class: " + classes[int(my_label[0])].decode("utf-8"))
+    plt.show()
