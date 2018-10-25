@@ -48,7 +48,7 @@ def dictionary_to_vector(parameters):
         if count == 0:
             theta = new_vector
         else:
-            theta = np.concatenate((theta, new_vector), axis=0)
+            theta = np.concatenate((theta, new_vector), axis=0)  # the vertical axis stitching
         count = count + 1
 
     return theta, keys
