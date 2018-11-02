@@ -55,10 +55,12 @@ def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
 
     mini_batches = []
 
-    permutation = list(np.random.permutation(m))
+    # Step 1: Shuffle (X, Y)
+    permutation = list(np.random.permutation(m))  # random order of 0 to m-1
     shuffle_X = X[:, permutation]
     shuffle_Y = Y[:, permutation]
 
+    # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
     num_complete_minibatches = m // mini_batch_size
     for k in range(num_complete_minibatches):
         mini_batch_x = shuffle_X[:, k * mini_batch_size:(k + 1) * mini_batch_size]
@@ -67,6 +69,7 @@ def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
         mini_batch = (mini_batch_x, mini_batch_y)
         mini_batches.append(mini_batch)
 
+    # Handling the end case (last mini-batch < mini_batch_size)
     if m % mini_batch_size != 0:
         mini_batch_x = shuffle_X[:, num_complete_minibatches * mini_batch_size:]
         mini_batch_y = shuffle_Y[:, num_complete_minibatches * mini_batch_size:]
@@ -77,28 +80,305 @@ def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
     return mini_batches
 
 
+def initialize_velocity(parameters):
+    """
+    Initializes the velocity as a python dictionary with:
+                - keys: "dW1", "db1", ..., "dWL", "dbL"
+                - values: numpy arrays of zeros of the same shape as the corresponding gradients/parameters.
+    Arguments:
+    parameters -- python dictionary containing your parameters.
+                    parameters['W' + str(l)] = Wl
+                    parameters['b' + str(l)] = bl
+
+    Returns:
+    v -- python dictionary containing the current velocity.
+                    v['dW' + str(l)] = velocity of dWl
+                    v['db' + str(l)] = velocity of dbl
+    """
+    v = {}
+    L = len(parameters) // 2
+    for l in range(L):
+        v['dW' + str(l + 1)] = np.zeros_like(parameters['W' + str(l + 1)])  # zeros matrix with same shape of para
+        v['db' + str(l + 1)] = np.zeros_like(parameters['b' + str(l + 1)])
+
+    return v
+
+
+def update_parameters_with_momentum(parameters, grads, v, beta, learning_rate):
+    """
+    Update parameters using Momentum
+
+    Arguments:
+    parameters -- python dictionary containing your parameters:
+                    parameters['W' + str(l)] = Wl
+                    parameters['b' + str(l)] = bl
+    grads -- python dictionary containing your gradients for each parameters:
+                    grads['dW' + str(l)] = dWl
+                    grads['db' + str(l)] = dbl
+    v -- python dictionary containing the current velocity:
+                    v['dW' + str(l)] = ...
+                    v['db' + str(l)] = ...
+    beta -- the momentum hyperparameter, scalar
+    learning_rate -- the learning rate, scalar
+
+    Returns:
+    parameters -- python dictionary containing your updated parameters
+    v -- python dictionary containing your updated velocities
+    """
+    L = len(parameters) // 2
+    for l in range(L):
+        v['dW' + str(l + 1)] = (1 - beta) * grads['dW' + str(l + 1)] + beta * v['dW' + str(l + 1)]
+        v['db' + str(l + 1)] = (1 - beta) * grads['db' + str(l + 1)] + beta * v['db' + str(l + 1)]
+
+        parameters['W' + str(l + 1)] = parameters['W' + str(l + 1)] - learning_rate * v['dW' + str(l + 1)]
+        parameters['b' + str(l + 1)] = parameters['b' + str(l + 1)] - learning_rate * v['db' + str(l + 1)]
+
+    return parameters, v
+
+
+def initialize_adam(parameters):
+    """
+    Initializes v and s as two python dictionaries with:
+                - keys: "dW1", "db1", ..., "dWL", "dbL"
+                - values: numpy arrays of zeros of the same shape as the corresponding gradients/parameters.
+
+    Arguments:
+    parameters -- python dictionary containing your parameters.
+                    parameters["W" + str(l)] = Wl
+                    parameters["b" + str(l)] = bl
+
+    Returns:
+    v -- python dictionary that will contain the exponentially weighted average of the gradient.
+                    v["dW" + str(l)] = ...
+                    v["db" + str(l)] = ...
+    s -- python dictionary that will contain the exponentially weighted average of the squared gradient.
+                    s["dW" + str(l)] = ...
+                    s["db" + str(l)] = ...
+
+    """
+    L = len(parameters) // 2  # number of layers in the neural networks
+    v = {}
+    s = {}
+
+    # Initialize v, s. Input: "parameters". Outputs: "v, s".
+    for l in range(L):
+        v["dW" + str(l + 1)] = np.zeros_like(parameters["W" + str(l + 1)])
+        v["db" + str(l + 1)] = np.zeros_like(parameters["b" + str(l + 1)])
+
+        s["dW" + str(l + 1)] = np.zeros_like(parameters["W" + str(l + 1)])
+        s["db" + str(l + 1)] = np.zeros_like(parameters["b" + str(l + 1)])
+
+    return v, s
+
+
+def update_parameters_with_adam(parameters, grads, v, s, t, learning_rate=0.01,
+                                beta1=0.9, beta2=0.999, epsilon=1e-8):
+    """
+    Update parameters using Adam
+
+    Arguments:
+    parameters -- python dictionary containing your parameters:
+                    parameters['W' + str(l)] = Wl
+                    parameters['b' + str(l)] = bl
+    grads -- python dictionary containing your gradients for each parameters:
+                    grads['dW' + str(l)] = dWl
+                    grads['db' + str(l)] = dbl
+    v -- Adam variable, moving average of the first gradient, python dictionary
+    s -- Adam variable, moving average of the squared gradient, python dictionary
+    learning_rate -- the learning rate, scalar.
+    beta1 -- Exponential decay hyperparameter for the first moment estimates
+    beta2 -- Exponential decay hyperparameter for the second moment estimates
+    epsilon -- hyperparameter preventing division by zero in Adam updates
+
+    Returns:
+    parameters -- python dictionary containing your updated parameters
+    v -- Adam variable, moving average of the first gradient, python dictionary
+    s -- Adam variable, moving average of the squared gradient, python dictionary
+    """
+    L = len(parameters) // 2
+    v_corrected = {}  # Initializing first moment estimate, python dictionary
+    s_corrected = {}  # Initializing second moment estimate, python dictionary
+
+    for l in range(1, L + 1):
+        # momentum with bias correction
+        v['dW' + str(l)] = beta1 * v['dW' + str(l)] + (1 - beta1) * grads['dW' + str(l)]
+        v_corrected['dW' + str(l)] = v['dW' + str(l)] / (1 - np.power(beta1, t))
+        v['db' + str(l)] = beta1 * v['db' + str(l)] + (1 - beta1) * grads['db' + str(l)]
+        v_corrected['db' + str(l)] = v['db' + str(l)] / (1 - np.power(beta1, t))
+
+        # RMSprob with bias correction
+        s['dW' + str(l)] = beta2 * s['dW' + str(l)] + (1 - beta2) * np.power(grads['dW' + str(l)], 2)
+        s_corrected['dW' + str(l)] = s['dW' + str(l)] / (1 - np.power(beta2, t))
+        s['db' + str(l)] = beta2 * s['db' + str(l)] + (1 - beta2) * np.power(grads['db' + str(l)], 2)
+        s_corrected['db' + str(l)] = s['db' + str(l)] / (1 - np.power(beta2, t))
+
+        # Update parameters
+        parameters['W' + str(l)] = parameters['W' + str(l)] - learning_rate * v_corrected['dW' + str(l)] / \
+                                                              np.sqrt(s_corrected['dW' + str(l)] + epsilon)
+        parameters['b' + str(l)] = parameters['b' + str(l)] - learning_rate * v_corrected['db' + str(l)] / \
+                                                              np.sqrt(s_corrected['db' + str(l)] + epsilon)
+
+    return parameters, v, s
+
+
+def model(X, Y, layers_dims, optimizer, learning_rate=0.0007, mini_batch_size=64, beta=0.9,
+          beta1=0.9, beta2=0.999, epsilon=1e-8, num_epochs=10000, print_cost=True):
+    """
+    3-layer neural network model which can be run in different optimizer modes.
+
+    Arguments:
+    X -- input data, of shape (2, number of examples)
+    Y -- true "label" vector (1 for blue dot / 0 for red dot), of shape (1, number of examples)
+    layers_dims -- python list, containing the size of each layer
+    learning_rate -- the learning rate, scalar.
+    mini_batch_size -- the size of a mini batch
+    beta -- Momentum hyperparameter
+    beta1 -- Exponential decay hyperparameter for the past gradients estimates
+    beta2 -- Exponential decay hyperparameter for the past squared gradients estimates
+    epsilon -- hyperparameter preventing division by zero in Adam updates
+    num_epochs -- number of epochs
+    print_cost -- True to print the cost every 1000 epochs
+
+    Returns:
+    parameters -- python dictionary containing your updated parameters
+    """
+    L = len(layers_dims)
+    costs = []
+    t = 0  # initializing the counter required for Adam update
+    seed = 10  # For grading purposes, so that your "random" minibatches are the same as ours
+
+    # Initialize parameters
+    parameters = initialize_parameters(layers_dims)
+    # Initialize the optimizer
+    if optimizer == 'gd':
+        pass
+    elif optimizer == 'momentum':
+        v = initialize_velocity(parameters)
+    elif optimizer == 'adam':
+        v, s = initialize_adam(parameters)
+
+    # Optimization loop
+    for i in range(num_epochs):
+        # Define the random minibatches. We increment the seed to reshuffle differently the dataset after each epoch
+        seed = seed + 1
+        minibatches = random_mini_batches(X, Y, mini_batch_size, seed)
+
+        for minibatch in minibatches:
+            (minibatch_x, minibatch_y) = minibatch
+
+            # Forward propagation
+            a3, caches = forward_propagation(minibatch_x, parameters)
+
+            # compute loss
+            cost = compute_cost(a3, minibatch_y)
+
+            # backward propagation
+            grads = backward_propagation(minibatch_x, minibatch_y, caches)
+
+            # update parameters
+            if optimizer == 'gd':
+                parameters = update_parameters_with_gd(parameters, grads, learning_rate)
+            elif optimizer == 'momentum':
+                parameters, v = update_parameters_with_momentum(parameters, grads, v, beta, learning_rate)
+            elif optimizer == 'adam':
+                t = t + 1  # Adam counter
+                parameters, v, s = update_parameters_with_adam(parameters, grads, v, s, t, learning_rate, beta1, beta2, epsilon)
+
+        # Print the cost every 1000 epoch
+        if print_cost and i % 1000 == 0:
+            print("Cost after epoch %i: %f" % (i, cost))
+        if print_cost and i % 100 == 0:
+            costs.append(cost)
+
+    # plot the cost
+    plt.plot(costs)
+    plt.ylabel('cost')
+    plt.xlabel('epochs (per 100)')
+    plt.title("Learning rate = " + str(learning_rate))
+    plt.show()
+
+    return parameters
+
+
 if __name__ == "__main__":
     plt.rcParams['figure.figsize'] = (7.0, 4.0)  # set default size of plots
     plt.rcParams['image.interpolation'] = 'nearest'
     plt.rcParams['image.cmap'] = 'gray'
 
-    # test update_parameters_with_gd
-    parameters, grads, learning_rate = update_parameters_with_gd_test_case()
+    # # test update_parameters_with_gd
+    # parameters, grads, learning_rate = update_parameters_with_gd_test_case()
+    #
+    # parameters = update_parameters_with_gd(parameters, grads, learning_rate)
+    # print("W1 = " + str(parameters["W1"]))
+    # print("b1 = " + str(parameters["b1"]))
+    # print("W2 = " + str(parameters["W2"]))
+    # print("b2 = " + str(parameters["b2"]))
+    #
+    # # test random_mini_batches
+    # X_assess, Y_assess, mini_batch_size = random_mini_batches_test_case()
+    # mini_batches = random_mini_batches(X_assess, Y_assess, mini_batch_size)
+    #
+    # print("shape of the 1st mini_batch_X: " + str(mini_batches[0][0].shape))
+    # print("shape of the 2nd mini_batch_X: " + str(mini_batches[1][0].shape))
+    # print("shape of the 3rd mini_batch_X: " + str(mini_batches[2][0].shape))
+    # print("shape of the 1st mini_batch_Y: " + str(mini_batches[0][1].shape))
+    # print("shape of the 2nd mini_batch_Y: " + str(mini_batches[1][1].shape))
+    # print("shape of the 3rd mini_batch_Y: " + str(mini_batches[2][1].shape))
+    # print("mini batch sanity check: " + str(mini_batches[0][0][0][0:3]))
+    #
+    # # test initialize_velocity
+    # parameters = initialize_velocity_test_case()
+    #
+    # v = initialize_velocity(parameters)
+    # print("v[\"dW1\"] = " + str(v["dW1"]))
+    # print("v[\"db1\"] = " + str(v["db1"]))
+    # print("v[\"dW2\"] = " + str(v["dW2"]))
+    # print("v[\"db2\"] = " + str(v["db2"]))
+    #
+    # # test update_parameters_with_momentum
+    # parameters, grads, v = update_parameters_with_momentum_test_case()
+    #
+    # parameters, v = update_parameters_with_momentum(parameters, grads, v, beta=0.9, learning_rate=0.01)
+    # print("W1 = " + str(parameters["W1"]))
+    # print("b1 = " + str(parameters["b1"]))
+    # print("W2 = " + str(parameters["W2"]))
+    # print("b2 = " + str(parameters["b2"]))
+    # print("v[\"dW1\"] = " + str(v["dW1"]))
+    # print("v[\"db1\"] = " + str(v["db1"]))
+    # print("v[\"dW2\"] = " + str(v["dW2"]))
+    # print("v[\"db2\"] = " + str(v["db2"]))
+    #
+    # # test update_parameters_with_adam
+    # parameters, grads, v, s = update_parameters_with_adam_test_case()
+    # parameters, v, s = update_parameters_with_adam(parameters, grads, v, s, t=2)
+    #
+    # print("W1 = " + str(parameters["W1"]))
+    # print("b1 = " + str(parameters["b1"]))
+    # print("W2 = " + str(parameters["W2"]))
+    # print("b2 = " + str(parameters["b2"]))
+    # print("v[\"dW1\"] = " + str(v["dW1"]))
+    # print("v[\"db1\"] = " + str(v["db1"]))
+    # print("v[\"dW2\"] = " + str(v["dW2"]))
+    # print("v[\"db2\"] = " + str(v["db2"]))
+    # print("s[\"dW1\"] = " + str(s["dW1"]))
+    # print("s[\"db1\"] = " + str(s["db1"]))
+    # print("s[\"dW2\"] = " + str(s["dW2"]))
+    # print("s[\"db2\"] = " + str(s["db2"]))
 
-    parameters = update_parameters_with_gd(parameters, grads, learning_rate)
-    print("W1 = " + str(parameters["W1"]))
-    print("b1 = " + str(parameters["b1"]))
-    print("W2 = " + str(parameters["W2"]))
-    print("b2 = " + str(parameters["b2"]))
+    train_X, train_Y = load_dataset(is_plot=False)
 
-    # test random_mini_batches
-    X_assess, Y_assess, mini_batch_size = random_mini_batches_test_case()
-    mini_batches = random_mini_batches(X_assess, Y_assess, mini_batch_size)
+    # train 3-layer model
+    layers_dims = [train_X.shape[0], 5, 2, 1]
+    # parameters = model(train_X, train_Y, layers_dims, optimizer="gd")
+    # parameters = model(train_X, train_Y, layers_dims, beta=0.9, optimizer="momentum")
+    parameters = model(train_X, train_Y, layers_dims, optimizer="adam")
 
-    print("shape of the 1st mini_batch_X: " + str(mini_batches[0][0].shape))
-    print("shape of the 2nd mini_batch_X: " + str(mini_batches[1][0].shape))
-    print("shape of the 3rd mini_batch_X: " + str(mini_batches[2][0].shape))
-    print("shape of the 1st mini_batch_Y: " + str(mini_batches[0][1].shape))
-    print("shape of the 2nd mini_batch_Y: " + str(mini_batches[1][1].shape))
-    print("shape of the 3rd mini_batch_Y: " + str(mini_batches[2][1].shape))
-    print("mini batch sanity check: " + str(mini_batches[0][0][0][0:3]))
+    # Predict
+    predictions = predict(train_X, train_Y, parameters)
+
+    # Plot decision boundary
+    plt.title("Model with Gradient Descent optimization")
+    axes = plt.gca()
+    axes.set_xlim([-1.5, 2.5])
+    axes.set_ylim([-1, 1.5])
+    plot_decision_boundary(lambda x: predict_dec(parameters, x.T), train_X, train_Y)
