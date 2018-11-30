@@ -1,0 +1,2 @@
+from numberGestureRecognition import initialize_parameters
+
