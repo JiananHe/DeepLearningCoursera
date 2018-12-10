@@ -1,20 +1,8 @@
-import numpy as np
-from keras import layers
 from keras.layers import Input, Add, Dense, Activation, ZeroPadding2D, BatchNormalization, Flatten, Conv2D, \
-    AveragePooling2D, MaxPooling2D, GlobalMaxPooling2D
+    AveragePooling2D, MaxPooling2D
 from keras.models import Model, load_model
-from keras.preprocessing import image
-from keras.utils import layer_utils
-from keras.utils.data_utils import get_file
-from keras.applications.imagenet_utils import preprocess_input
-import pydot
-from IPython.display import SVG
-from keras.utils.vis_utils import model_to_dot
-from keras.utils import plot_model
 from resnets_utils import *
 from keras.initializers import glorot_uniform
-import scipy.misc
-from matplotlib.pyplot import imshow
 
 import keras.backend as K
 
@@ -230,8 +218,11 @@ if __name__ == "__main__":
     #     print("out = " + str(out[0][1][1][0]))
 
     # Run the following code to build the model's graph.
-    model = ResNet50(input_shape=(64, 64, 3), classes=6)
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    # model = ResNet50(input_shape=(64, 64, 3), classes=6)
+    # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    # continue to train
+    model = load_model('model.h5')
 
     X_train_orig, Y_train_orig, X_test_orig, Y_test_orig, classes = load_dataset()
 
