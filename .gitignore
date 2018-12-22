@@ -2,5 +2,5 @@ __pycache__
 .idea
 *.pyc
 *.h5
-/Course 4 - Convolutional Neural Networks/Week 3 - Autonomous driving - Car detection/*
-!/Course 4 - Convolutional Neural Networks/Week 3 - Autonomous driving - Car detection/*.py
+*.weights
+*.cfg
