@@ -4,3 +4,6 @@ __pycache__
 *.h5
 *.weights
 *.cfg
+*.mat
+*.csv
+**/output/
