@@ -195,13 +195,15 @@ if __name__=="__main__":
     sess = tf.InteractiveSession()
 
     # load content image
-    content_image = scipy.misc.imread("images/louvre_small.jpg")
+    content_image = scipy.misc.imread("images/lion.jpg")
+    content_image = scipy.misc.imresize(content_image, [300, 400])
     imshow(content_image)
     plt.show()
     content_image = reshape_and_normalize_image(content_image)
 
     # load style image
-    style_image = scipy.misc.imread("images/monet.jpg")
+    style_image = scipy.misc.imread("images/van_gogh_star1_style.jpg")
+    style_image = scipy.misc.imresize(style_image, [300, 400])
     imshow(style_image)
     plt.show()
     style_image = reshape_and_normalize_image(style_image)
